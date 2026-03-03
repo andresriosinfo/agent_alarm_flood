@@ -1,0 +1,17 @@
+# Entornos virtuales
+venv/
+flood_agent/
+
+# Python
+__pycache__/
+*.pyc
+
+# Variables de entorno
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Artefactos
+artifacts/
+*.parquet
