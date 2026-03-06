@@ -1,0 +1,102 @@
+.block-container {
+    padding-top: 1.2rem;
+    padding-bottom: 1.2rem;
+    max-width: 1400px;
+}
+
+.section-header {
+    margin-bottom: 0.75rem;
+}
+
+.section-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #E8EEF5;
+}
+
+.section-subtitle {
+    font-size: 0.95rem;
+    color: #9FB0C0;
+    margin-top: 0.2rem;
+}
+
+.summary-card {
+    background: #151A22;
+    border: 1px solid #2A3342;
+    border-radius: 18px;
+    padding: 18px;
+    min-height: 120px;
+}
+
+.summary-card-title {
+    color: #9FB0C0;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+
+.summary-card-value {
+    color: #E8EEF5;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.summary-card-help {
+    color: #7F92A6;
+    font-size: 0.82rem;
+}
+
+.info-card {
+    background: #151A22;
+    border: 1px solid #2A3342;
+    border-radius: 18px;
+    padding: 20px;
+    margin-bottom: 16px;
+}
+
+.info-card-title {
+    color: #9FB0C0;
+    font-size: 0.92rem;
+    margin-bottom: 10px;
+}
+
+.info-card-body {
+    color: #DDE7F0;
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: 1px solid #2A3342;
+}
+
+.badge-neutral {
+    background: #1B2330;
+    color: #C8D4E0;
+}
+
+.badge-success {
+    background: rgba(0, 194, 168, 0.12);
+    color: #7CE8D8;
+}
+
+.badge-warning {
+    background: rgba(255, 193, 7, 0.12);
+    color: #FFD666;
+}
+
+.badge-danger {
+    background: rgba(255, 99, 99, 0.12);
+    color: #FF9B9B;
+}
+
+div[data-testid="stDataFrame"] {
+    border: 1px solid #2A3342;
+    border-radius: 16px;
+    overflow: hidden;
+}
