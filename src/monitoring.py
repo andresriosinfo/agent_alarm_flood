@@ -9,31 +9,55 @@ def read_recent_alarm_events(
     db_config: DBConfig,
     flood_config: FloodConfig,
     minutes: int = 15,
+    anchor_time: str | None = None,
 ) -> pd.DataFrame:
     """
-    Lee las alarmas de los últimos N minutos tomando como referencia
-    el timestamp máximo disponible en la tabla.
+    Lee alarmas de los últimos N minutos.
+
+    Si anchor_time es None:
+        usa el timestamp máximo disponible en la tabla.
+    Si anchor_time viene definido:
+        usa ese timestamp como final de la ventana.
     """
-    q = f"""
-    WITH mx AS (
-        SELECT MAX([{flood_config.time_col}]) AS mx_t
+    if anchor_time is None:
+        q = f"""
+        WITH mx AS (
+            SELECT MAX([{flood_config.time_col}]) AS anchor_t
+            FROM [{db_config.database}].[{db_config.schema}].[{db_config.table}]
+        )
+        SELECT
+            [{flood_config.time_col}] AS event_time,
+            [TAG_DESCRIPTION] AS tag,
+            [ALARM_DESCRIPTION] AS message,
+            [{flood_config.priority_col}] AS priority,
+            [ALARM_ID] AS alarm_id,
+            [LOCATION] AS location,
+            [GRP] AS grp
         FROM [{db_config.database}].[{db_config.schema}].[{db_config.table}]
-    )
-    SELECT
-        [{flood_config.time_col}] AS event_time,
-        [TAG_DESCRIPTION] AS tag,
-        [ALARM_DESCRIPTION] AS message,
-        [{flood_config.priority_col}] AS priority,
-        [ALARM_ID] AS alarm_id,
-        [LOCATION] AS location,
-        [GRP] AS grp
-    FROM [{db_config.database}].[{db_config.schema}].[{db_config.table}]
-    CROSS JOIN mx
-    WHERE [{flood_config.time_col}] >= DATEADD(minute, -{minutes}, mx.mx_t)
-      AND [{flood_config.time_col}] IS NOT NULL
-    ORDER BY [{flood_config.time_col}] ASC
-    """
-    df = read_sql_df(conn, q)
+        CROSS JOIN mx
+        WHERE [{flood_config.time_col}] >= DATEADD(minute, -{minutes}, mx.anchor_t)
+          AND [{flood_config.time_col}] <= mx.anchor_t
+          AND [{flood_config.time_col}] IS NOT NULL
+        ORDER BY [{flood_config.time_col}] ASC
+        """
+        df = read_sql_df(conn, q)
+    else:
+        q = f"""
+        SELECT
+            [{flood_config.time_col}] AS event_time,
+            [TAG_DESCRIPTION] AS tag,
+            [ALARM_DESCRIPTION] AS message,
+            [{flood_config.priority_col}] AS priority,
+            [ALARM_ID] AS alarm_id,
+            [LOCATION] AS location,
+            [GRP] AS grp
+        FROM [{db_config.database}].[{db_config.schema}].[{db_config.table}]
+        WHERE [{flood_config.time_col}] >= DATEADD(minute, -{minutes}, CAST(? AS DATETIME))
+          AND [{flood_config.time_col}] <= CAST(? AS DATETIME)
+          AND [{flood_config.time_col}] IS NOT NULL
+        ORDER BY [{flood_config.time_col}] ASC
+        """
+        df = read_sql_df(conn, q, params=[anchor_time, anchor_time])
 
     if df.empty:
         return df
@@ -84,10 +108,6 @@ def _unique_tags(df: pd.DataFrame) -> int:
 
 
 def _new_tags_last_1m_vs_prev(df_5m: pd.DataFrame) -> int:
-    """
-    Compara tags del último minuto contra los 4 minutos previos dentro
-    de la ventana de 5 minutos.
-    """
     if df_5m.empty:
         return 0
 
@@ -108,14 +128,6 @@ def _new_tags_last_1m_vs_prev(df_5m: pd.DataFrame) -> int:
 
 
 def compute_recent_features(df_recent: pd.DataFrame, baseline: dict) -> dict:
-    """
-    Calcula features operacionales sobre una ventana reciente.
-    Espera columnas:
-    - event_time
-    - priority
-    - tag
-    - message
-    """
     if df_recent.empty:
         return {
             "window_end": None,

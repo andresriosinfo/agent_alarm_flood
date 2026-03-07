@@ -11,10 +11,6 @@ from src.classifier import classify_blocks
 
 
 def _prepare_recent_for_block_builder(df_recent, flood_config):
-    """
-    Adapta nombres de columnas de la lectura reciente al formato esperado
-    por build_alarm_blocks().
-    """
     if df_recent.empty:
         return df_recent.copy()
 
@@ -27,10 +23,6 @@ def _prepare_recent_for_block_builder(df_recent, flood_config):
 
 
 def _detect_active_flood_from_recent(df_recent, baseline: dict, flood_config) -> tuple[bool, dict | None]:
-    """
-    Intenta detectar si en la ventana reciente ya existe un flood activo.
-    Si encuentra bloques clasificables, toma el más reciente.
-    """
     if df_recent.empty:
         return False, None
 
@@ -63,17 +55,29 @@ def _detect_active_flood_from_recent(df_recent, baseline: dict, flood_config) ->
     return True, latest
 
 
-def assess_current_state(conn, db_config, flood_config) -> dict:
+def assess_current_state(
+    conn,
+    db_config,
+    flood_config,
+    anchor_time: str | None = None,
+    baseline: dict | None = None,
+) -> dict:
     """
-    Evaluación operacional unificada del estado actual.
+    Evaluación operacional unificada del estado actual o de un punto histórico.
+    Si anchor_time viene definido, evalúa la ventana que termina en ese instante.
+
+    Si baseline viene definido, lo reutiliza.
+    Si no viene, lo calcula.
     """
-    baseline = compute_baseline_last_days(conn, db_config, flood_config)
+    if baseline is None:
+        baseline = compute_baseline_last_days(conn, db_config, flood_config)
 
     df_recent = read_recent_alarm_events(
         conn,
         db_config,
         flood_config,
         minutes=15,
+        anchor_time=anchor_time,
     )
 
     features = compute_recent_features(df_recent, baseline)
@@ -97,6 +101,7 @@ def assess_current_state(conn, db_config, flood_config) -> dict:
         reasons = ["recent alarm behavior differs from the normal baseline"]
 
     return {
+        "anchor_time": anchor_time,
         "baseline": baseline,
         "recent_features": features,
         "regime_change": regime_change,
