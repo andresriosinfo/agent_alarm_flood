@@ -1,12 +1,10 @@
 import sys
 from pathlib import Path
-from datetime import datetime, time
+from datetime import datetime
 
 import altair as alt
 import pandas as pd
 import streamlit as st
-
-
 
 # Asegura que se pueda importar src/
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,10 +13,14 @@ if str(ROOT) not in sys.path:
 
 from src.config import DBConfig, FloodConfig, DataSourceConfig
 from src.data_loader import load_alarms
-from src.baseline_cache import get_or_create_baseline
 from src.operational_agent import assess_current_state
 
 
+st.set_page_config(
+    page_title="Inteligencia de Alarmas",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
 st.markdown("""
 <style>
@@ -187,13 +189,11 @@ def load_alarms_cached() -> pd.DataFrame:
 
 @st.cache_resource(show_spinner=False)
 def get_baseline_cached():
-
     df_alarms = load_alarms_cached()
     flood_cfg = FloodConfig()
     time_col = flood_cfg.time_col
 
     df = df_alarms.copy()
-
     df[time_col] = pd.to_datetime(df[time_col], errors="coerce")
     df = df.dropna(subset=[time_col]).sort_values(time_col)
 
@@ -208,9 +208,9 @@ def get_baseline_cached():
         return {
             "scope": "csv_snapshot",
             "window_days": 0,
-            "rate_p95": 0,
-            "rate_p99": 0,
-            "rate_p999": 0,
+            "rate_p95": 0.0,
+            "rate_p99": 0.0,
+            "rate_p999": 0.0,
             "max_per_minute": 0,
             "n_minutes": 0,
         }
@@ -224,6 +224,7 @@ def get_baseline_cached():
         "max_per_minute": int(per_minute.max()),
         "n_minutes": int(len(per_minute)),
     }
+
 
 def traducir_estado(state: str) -> str:
     mapping = {
@@ -582,6 +583,57 @@ def make_state_timeline_chart(timeline_df: pd.DataFrame) -> alt.Chart:
     )
 
 
+# -----------------------------
+# Preparación de datos para UI
+# -----------------------------
+df_ui = load_alarms_cached()
+flood_cfg = FloodConfig()
+time_col = flood_cfg.time_col
+
+if df_ui.empty:
+    st.error("El archivo CSV no contiene datos.")
+    st.stop()
+
+if time_col not in df_ui.columns:
+    st.error(f"No existe la columna de tiempo esperada: {time_col}")
+    st.stop()
+
+df_ui = df_ui.copy()
+df_ui[time_col] = pd.to_datetime(df_ui[time_col], errors="coerce")
+df_ui = df_ui.dropna(subset=[time_col]).sort_values(time_col)
+
+if df_ui.empty:
+    st.error("No hay timestamps válidos en el CSV.")
+    st.stop()
+
+df_ui["timestamp_minute"] = df_ui[time_col].dt.floor("min")
+
+available_dates = sorted(df_ui["timestamp_minute"].dt.date.unique())
+min_dt = df_ui["timestamp_minute"].min()
+max_dt = df_ui["timestamp_minute"].max()
+
+example_points = (
+    df_ui["timestamp_minute"]
+    .drop_duplicates()
+    .sort_values()
+    .reset_index(drop=True)
+)
+
+if len(example_points) >= 3:
+    example_1 = str(example_points.iloc[len(example_points) // 4].to_pydatetime())
+    example_2 = str(example_points.iloc[len(example_points) // 2].to_pydatetime())
+    example_3 = str(example_points.iloc[-1].to_pydatetime())
+elif len(example_points) == 2:
+    example_1 = str(example_points.iloc[0].to_pydatetime())
+    example_2 = str(example_points.iloc[1].to_pydatetime())
+    example_3 = str(example_points.iloc[1].to_pydatetime())
+else:
+    only_ts = str(example_points.iloc[0].to_pydatetime())
+    example_1 = only_ts
+    example_2 = only_ts
+    example_3 = only_ts
+
+
 st.markdown('<div class="main-title">Inteligencia de Alarmas Industrial</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="main-subtitle">Reproducción histórica de la evaluación operacional del agente</div>',
@@ -592,10 +644,29 @@ with st.container():
     c1, c2, c3 = st.columns([1, 1, 0.8])
 
     with c1:
-        selected_date = st.date_input("Fecha de replay", value=datetime(2025, 5, 10).date())
+        selected_date = st.date_input(
+            "Fecha de replay",
+            value=max_dt.date(),
+            min_value=min_dt.date(),
+            max_value=max_dt.date(),
+        )
+
+        if selected_date not in available_dates:
+            selected_date = available_dates[-1]
+
+    day_df = df_ui[df_ui["timestamp_minute"].dt.date == selected_date].copy()
+    available_times = sorted(day_df["timestamp_minute"].dt.strftime("%H:%M:%S").unique().tolist())
+
+    if not available_times:
+        st.warning("No hay horas disponibles para la fecha seleccionada.")
+        st.stop()
 
     with c2:
-        selected_time = st.time_input("Hora de replay", value=time(14, 35, 0), step=60)
+        selected_time_str = st.selectbox(
+            "Hora de replay",
+            options=available_times,
+            index=len(available_times) - 1,
+        )
 
     with c3:
         st.markdown("<div style='height: 1.85rem;'></div>", unsafe_allow_html=True)
@@ -604,19 +675,18 @@ with st.container():
 quick_col1, quick_col2, quick_col3 = st.columns(3)
 with quick_col1:
     if st.button("Cargar ejemplo 1", use_container_width=True):
-        st.session_state["quick_anchor"] = "2025-12-27 23:56:15"
+        st.session_state["quick_anchor"] = example_1
 with quick_col2:
     if st.button("Cargar ejemplo 2", use_container_width=True):
-        st.session_state["quick_anchor"] = "2025-05-10 14:30:00"
+        st.session_state["quick_anchor"] = example_2
 with quick_col3:
     if st.button("Cargar ejemplo 3", use_container_width=True):
-        st.session_state["quick_anchor"] = "2025-05-10 14:35:00"
+        st.session_state["quick_anchor"] = example_3
 
 if "quick_anchor" in st.session_state and not run_btn:
     anchor_str = st.session_state["quick_anchor"]
 else:
-    anchor_dt = datetime.combine(selected_date, selected_time)
-    anchor_str = anchor_dt.strftime("%Y-%m-%d %H:%M:%S")
+    anchor_str = f"{selected_date} {selected_time_str}"
 
 baseline = get_baseline_cached()
 baseline_key = (
