@@ -697,6 +697,8 @@ def render_header_logos():
         """,
         unsafe_allow_html=True,
     )
+
+render_header_logos()
 st.markdown('<div class="main-title">Agente de alarmas industriales</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="main-subtitle">Reproducción histórica de la evaluación operacional del agente</div>',
