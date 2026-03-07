@@ -5,6 +5,7 @@ from datetime import datetime
 import altair as alt
 import pandas as pd
 import streamlit as st
+from PIL import Image, ImageChops
 
 # Asegura que se pueda importar src/
 ROOT = Path(__file__).resolve().parents[1]
@@ -168,14 +169,8 @@ div[data-testid="stVegaLiteChart"] {
     background: #111827;
     border: 1px solid #243041;
     border-radius: 18px;
-    padding: 22px 28px 18px 28px;
+    padding: 10px 28px 8px 28px;
     margin-bottom: 1.4rem;
-}
-.logo-caption {
-    color: #94A3B8;
-    text-align: center;
-    font-size: 0.82rem;
-    margin-top: 0.35rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -586,23 +581,54 @@ def make_state_timeline_chart(timeline_df: pd.DataFrame) -> alt.Chart:
     )
 
 
+def crop_transparent_margins(image_path: Path) -> Image.Image:
+    img = Image.open(image_path).convert("RGBA")
+    bg = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    diff = ImageChops.difference(img, bg)
+    bbox = diff.getbbox()
+    if bbox:
+        img = img.crop(bbox)
+    return img
+
+
+def prepare_logo(image_path: Path, crop: bool = False) -> Image.Image:
+    if crop:
+        return crop_transparent_margins(image_path)
+    return Image.open(image_path)
+
+
 def render_header_logos():
     se_logo_path = ROOT / "se_logo.png"
     ypf_logo_path = ROOT / "ypf_logo.png"
 
     st.markdown('<div class="logo-panel">', unsafe_allow_html=True)
-
     col_left, col_right = st.columns(2)
 
     with col_left:
         if se_logo_path.exists():
-            st.image(str(se_logo_path), width=300)
+            se_img = prepare_logo(se_logo_path, crop=True)
+            st.markdown(
+                """
+                <div style="height:120px; display:flex; align-items:center; justify-content:center;">
+                """,
+                unsafe_allow_html=True,
+            )
+            st.image(se_img, width=360)
+            st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.warning("No se encontró se_logo.png")
 
     with col_right:
         if ypf_logo_path.exists():
-            st.image(str(ypf_logo_path), width=240)
+            ypf_img = prepare_logo(ypf_logo_path, crop=False)
+            st.markdown(
+                """
+                <div style="height:120px; display:flex; align-items:center; justify-content:center;">
+                """,
+                unsafe_allow_html=True,
+            )
+            st.image(ypf_img, width=235)
+            st.markdown("</div>", unsafe_allow_html=True)
         else:
             st.warning("No se encontró ypf_logo.png")
 
