@@ -189,6 +189,23 @@ def load_alarms_cached() -> pd.DataFrame:
 def get_baseline_cached():
 
     df_alarms = load_alarms_cached()
+    df_debug = load_alarms_cached()
+
+    st.write("Shape del CSV:", df_debug.shape)
+    st.write("Columnas:", list(df_debug.columns))
+    
+    if not df_debug.empty:
+        st.write("Primeras filas:")
+        st.dataframe(df_debug.head())
+
+    time_col = FloodConfig().time_col
+    if time_col in df_debug.columns:
+        st.write("Mín fecha:", df_debug[time_col].min())
+        st.write("Máx fecha:", df_debug[time_col].max())
+    else:
+        st.error(f"No existe la columna de tiempo: {time_col}")
+else:
+    st.error("El dataframe cargado está vacío")
     flood_cfg = FloodConfig()
     time_col = flood_cfg.time_col
 
