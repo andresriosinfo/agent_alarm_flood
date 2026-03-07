@@ -679,6 +679,13 @@ def render_header_logos():
             object-fit: contain;
             display: block;
         }}
+        .logo-se img {{
+            max-height: 100px;
+        }}
+        
+        .logo-ypf img {{
+            max-height: 65px;
+        }}
         @media (max-width: 900px) {{
             .logos-wrapper {{
                 flex-direction: column;
