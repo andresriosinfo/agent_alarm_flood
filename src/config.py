@@ -13,6 +13,11 @@ class DBConfig:
     schema: str = "dbo"
     table: str = "ypf_alarms"
 
+@dataclass(frozen=True)
+class DataSourceConfig:
+    mode: str = os.getenv("DATA_SOURCE_MODE", "csv")   # "csv" o "sql"
+    csv_path: str = os.getenv("ALARMS_CSV_PATH", "data/alarms_snapshot.csv")
+
 
 @dataclass(frozen=True)
 class FloodConfig:
