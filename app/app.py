@@ -18,7 +18,7 @@ from src.operational_agent import assess_current_state
 
 
 st.set_page_config(
-    page_title="Agente inteligente de alarmas",
+    page_title="Agente Inteligente para Monitoreo de Alarmas Industriales",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -688,9 +688,9 @@ else:
 
 render_header_logos()
 
-st.markdown('<div class="main-title">Agente de alarmas industriales</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">Agente Inteligente para Monitoreo de Alarmas Industriales</div>', unsafe_allow_html=True)
 st.markdown(
-    '<div class="main-subtitle">Reproducción histórica de la evaluación operacional del agente</div>',
+    '<div class="main-subtitle">Evaluación histórica del comportamiento operacional y soporte a la toma de decisiones</div>',
     unsafe_allow_html=True
 )
 
