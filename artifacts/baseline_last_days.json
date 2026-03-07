@@ -1,0 +1,9 @@
+{
+  "scope": "last_30_days",
+  "window_days": 30,
+  "rate_p95": 6.0,
+  "rate_p99": 11.0,
+  "rate_p999": 18.0,
+  "max_per_minute": 27,
+  "n_minutes": 38274
+}
