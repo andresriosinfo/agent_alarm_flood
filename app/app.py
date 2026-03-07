@@ -198,14 +198,14 @@ def get_baseline_cached():
         st.write("Primeras filas:")
         st.dataframe(df_debug.head())
 
-    time_col = FloodConfig().time_col
-    if time_col in df_debug.columns:
-        st.write("Mín fecha:", df_debug[time_col].min())
-        st.write("Máx fecha:", df_debug[time_col].max())
+        time_col = FloodConfig().time_col
+        if time_col in df_debug.columns:
+            st.write("Mín fecha:", df_debug[time_col].min())
+            st.write("Máx fecha:", df_debug[time_col].max())
+        else:
+            st.error(f"No existe la columna de tiempo: {time_col}")
     else:
-        st.error(f"No existe la columna de tiempo: {time_col}")
-else:
-    st.error("El dataframe cargado está vacío")
+        st.error("El dataframe cargado está vacío")
     flood_cfg = FloodConfig()
     time_col = flood_cfg.time_col
 
