@@ -17,7 +17,7 @@ from src.operational_agent import assess_current_state
 
 
 st.set_page_config(
-    page_title="Inteligencia de Alarmas",
+    page_title="Agente inteligente de alarmas",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -634,7 +634,7 @@ else:
     example_3 = only_ts
 
 
-st.markdown('<div class="main-title">Inteligencia de Alarmas Industrial</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-title">Agente de alarmas industriales</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="main-subtitle">Reproducción histórica de la evaluación operacional del agente</div>',
     unsafe_allow_html=True
