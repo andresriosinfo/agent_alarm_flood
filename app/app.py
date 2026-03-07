@@ -11,8 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.config import DBConfig, FloodConfig
-from src.db import get_connection
+from src.config import DBConfig, FloodConfig, DataSourceConfig
+from src.data_loader import load_alarms
 from src.baseline_cache import get_or_create_baseline
 from src.operational_agent import assess_current_state
 
@@ -169,19 +169,35 @@ div[data-testid="stVegaLiteChart"] {
 """, unsafe_allow_html=True)
 
 
+@st.cache_data(show_spinner=False)
+def load_alarms_cached() -> pd.DataFrame:
+    df = load_alarms(
+        data_cfg=DataSourceConfig(),
+        db_cfg=DBConfig(),
+        flood_cfg=FloodConfig(),
+    )
+
+    flood_cfg = FloodConfig()
+    time_col = flood_cfg.time_col
+
+    df = df.copy()
+    if time_col in df.columns:
+        df[time_col] = pd.to_datetime(df[time_col], errors="coerce")
+        df = df.dropna(subset=[time_col]).sort_values(time_col)
+
+    return df
+
+
 @st.cache_resource(show_spinner=False)
 def get_baseline_cached():
-    conn = get_connection(DBConfig())
-    try:
-        baseline = get_or_create_baseline(
-            conn=conn,
-            db_config=DBConfig(),
-            flood_config=FloodConfig(),
-            force_recompute=False,
-        )
-        return baseline
-    finally:
-        conn.close()
+    df_alarms = load_alarms_cached()
+
+    baseline = get_or_create_baseline(
+        df_alarms=df_alarms,
+        flood_config=FloodConfig(),
+        force_recompute=False,
+    )
+    return baseline
 
 
 def traducir_estado(state: str) -> str:
@@ -192,6 +208,7 @@ def traducir_estado(state: str) -> str:
         "FLOOD DETECTED": "FLOOD",
     }
     return mapping.get(state, state)
+
 
 def traducir_postura(posture: str) -> str:
     mapping = {
@@ -209,7 +226,6 @@ def traducir_accion(action: str) -> str:
         "notify_and_prioritize": "Notificar al operador y priorizar revisión",
         "group_and_prioritize": "Agrupar alarmas repetitivas y priorizar revisión",
         "auto_incident": "Generar incidente y escalar atención",
-
         "No se requiere acción inmediata": "No se requiere acción inmediata",
         "Revisar el área afectada y seguir la evolución de alarmas": "Revisar el área afectada y seguir la evolución de alarmas",
         "Priorizar revisión operativa y preparar escalamiento": "Priorizar revisión operativa y preparar escalamiento",
@@ -228,6 +244,7 @@ def traducir_severidad(severity: str) -> str:
     }
     return mapping.get((severity or "").lower(), severity)
 
+
 def traducir_tipo_evento(event_type: str) -> str:
     mapping = {
         "SUBSYSTEM_TRIP_EVENT": "Disparo de subsistema",
@@ -242,6 +259,7 @@ def traducir_tipo_evento(event_type: str) -> str:
 
 def traducir_booleano(value: bool) -> str:
     return "Sí" if value else "No"
+
 
 def get_status_class(state: str) -> str:
     if state == "FLOOD DETECTED":
@@ -314,10 +332,6 @@ def operator_message(result: dict) -> str:
 
 
 def explain_reasons_for_operator(result: dict) -> list[str]:
-    """
-    Traduce señales internas del motor a explicaciones más detalladas,
-    entendibles para un operario.
-    """
     features = result.get("recent_features", {})
     state = result.get("current_state", "NORMAL")
 
@@ -399,19 +413,16 @@ def explain_reasons_for_operator(result: dict) -> list[str]:
 
 @st.cache_data(show_spinner=False)
 def run_replay_cached(anchor_time_str: str, baseline_key: str) -> dict:
-    conn = get_connection(DBConfig())
-    try:
-        baseline = get_baseline_cached()
-        result = assess_current_state(
-            conn=conn,
-            db_config=DBConfig(),
-            flood_config=FloodConfig(),
-            anchor_time=anchor_time_str,
-            baseline=baseline,
-        )
-        return result
-    finally:
-        conn.close()
+    df_alarms = load_alarms_cached()
+    baseline = get_baseline_cached()
+
+    result = assess_current_state(
+        df_alarms=df_alarms,
+        flood_config=FloodConfig(),
+        anchor_time=anchor_time_str,
+        baseline=baseline,
+    )
+    return result
 
 
 @st.cache_data(show_spinner=False)
@@ -761,7 +772,6 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("## Señales operacionales observadas")
-
 
 for reason in operator_reasons:
     st.markdown(f"""
