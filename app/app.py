@@ -6,6 +6,9 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
+import inspect
+st.write(inspect.signature(get_or_create_baseline))
+
 # Asegura que se pueda importar src/
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
