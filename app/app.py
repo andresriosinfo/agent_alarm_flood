@@ -5,6 +5,7 @@ from datetime import datetime
 import altair as alt
 import pandas as pd
 import streamlit as st
+import base64
 
 # Asegura que se pueda importar src/
 ROOT = Path(__file__).resolve().parents[1]
