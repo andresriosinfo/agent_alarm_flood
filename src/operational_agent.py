@@ -5,6 +5,7 @@ from src.risk_engine import (
     compute_risk_score,
     get_operational_state,
     get_operational_posture,
+    get_recommended_action,
 )
 from src.block_builder import build_alarm_blocks
 from src.classifier import classify_blocks
@@ -96,6 +97,11 @@ def assess_current_state(
     )
 
     posture = get_operational_posture(state)
+    
+    recommended_action = get_recommended_action(
+        state=state,
+        current_event=current_event,
+    )
 
     if regime_change and not reasons:
         reasons = ["recent alarm behavior differs from the normal baseline"]
@@ -111,4 +117,5 @@ def assess_current_state(
         "reasons": reasons,
         "flood_detected": flood_detected,
         "current_event": current_event,
+        "recommended_action": recommended_action,
     }

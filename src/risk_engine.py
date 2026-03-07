@@ -74,3 +74,28 @@ def get_operational_posture(state: str) -> str:
     if state == "ELEVATED RISK":
         return "Maintain enhanced monitoring and review the affected area."
     return "Continue normal monitoring."
+
+def get_recommended_action(state: str, current_event: dict | None = None) -> str:
+    """
+    Devuelve la acción concreta recomendada.
+    Si ya existe un evento clasificado, usa su acción.
+    Si no existe, devuelve una acción temprana según el estado.
+    """
+    if current_event is not None:
+        event_action = current_event.get("recommended_action", "no_action")
+
+        mapping = {
+            "no_action": "No se requiere acción inmediata",
+            "notify_and_prioritize": "Notificar al operador y priorizar revisión",
+            "group_and_prioritize": "Agrupar alarmas repetitivas y priorizar revisión",
+            "auto_incident": "Generar incidente y escalar atención",
+        }
+        return mapping.get(event_action, "Revisar evento")
+
+    state_mapping = {
+        "NORMAL": "No se requiere acción inmediata",
+        "ELEVATED RISK": "Revisar el área afectada y seguir la evolución de alarmas",
+        "HIGH RISK OF FLOOD": "Priorizar revisión operativa y preparar escalamiento",
+        "FLOOD DETECTED": "Escalar atención del evento de inmediato",
+    }
+    return state_mapping.get(state, "Revisar condición actual")
