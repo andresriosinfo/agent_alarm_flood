@@ -193,15 +193,43 @@ def load_alarms_cached() -> pd.DataFrame:
 
 @st.cache_resource(show_spinner=False)
 def get_baseline_cached():
+
     df_alarms = load_alarms_cached()
+    flood_cfg = FloodConfig()
+    time_col = flood_cfg.time_col
 
-    baseline = get_or_create_baseline(
-        df_alarms=df_alarms,
-        flood_config=FloodConfig(),
-        force_recompute=False,
+    df = df_alarms.copy()
+
+    df[time_col] = pd.to_datetime(df[time_col], errors="coerce")
+    df = df.dropna(subset=[time_col]).sort_values(time_col)
+
+    per_minute = (
+        df.set_index(time_col)
+        .resample("1min")
+        .size()
+        .rename("alarm_count")
     )
-    return baseline
 
+    if per_minute.empty:
+        return {
+            "scope": "csv_snapshot",
+            "window_days": 0,
+            "rate_p95": 0,
+            "rate_p99": 0,
+            "rate_p999": 0,
+            "max_per_minute": 0,
+            "n_minutes": 0,
+        }
+
+    return {
+        "scope": "csv_snapshot",
+        "window_days": 0,
+        "rate_p95": float(per_minute.quantile(0.95)),
+        "rate_p99": float(per_minute.quantile(0.99)),
+        "rate_p999": float(per_minute.quantile(0.999)),
+        "max_per_minute": int(per_minute.max()),
+        "n_minutes": int(len(per_minute)),
+    }
 
 def traducir_estado(state: str) -> str:
     mapping = {
