@@ -34,7 +34,7 @@ class FloodConfig:
 
 
 def get_db_password(env_var: str) -> str:
-    password = S4nT4f3_+*4Xl
+    password = os.getenv(env_var)
     if not password:
         raise RuntimeError(
             f"No se encontró la variable de entorno {env_var}. "
