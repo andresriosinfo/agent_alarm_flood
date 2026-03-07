@@ -633,7 +633,70 @@ else:
     example_2 = only_ts
     example_3 = only_ts
 
+def image_to_base64(path: str) -> str:
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode("utf-8")
 
+
+def render_header_logos():
+    se_logo_path = ROOT / "se_logo.png"
+    ypf_logo_path = ROOT / "ypf_logo.png"
+
+    if not se_logo_path.exists() or not ypf_logo_path.exists():
+        st.warning("No se encontraron los logos en la raíz del proyecto.")
+        return
+
+    se_logo_b64 = image_to_base64(str(se_logo_path))
+    ypf_logo_b64 = image_to_base64(str(ypf_logo_path))
+
+    st.markdown(
+        f"""
+        <style>
+        .logos-wrapper {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 2rem;
+            background: #111827;
+            border: 1px solid #243041;
+            border-radius: 18px;
+            padding: 18px 28px;
+            margin-bottom: 1.2rem;
+        }}
+        .logo-box {{
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 110px;
+        }}
+        .logo-box img {{
+            max-height: 72px;
+            max-width: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+        }}
+        @media (max-width: 900px) {{
+            .logos-wrapper {{
+                flex-direction: column;
+                gap: 1rem;
+            }}
+        }}
+        </style>
+
+        <div class="logos-wrapper">
+            <div class="logo-box">
+                <img src="data:image/png;base64,{se_logo_b64}" alt="Schneider Electric">
+            </div>
+            <div class="logo-box">
+                <img src="data:image/png;base64,{ypf_logo_b64}" alt="YPF">
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 st.markdown('<div class="main-title">Agente de alarmas industriales</div>', unsafe_allow_html=True)
 st.markdown(
     '<div class="main-subtitle">Reproducción histórica de la evaluación operacional del agente</div>',
