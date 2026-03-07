@@ -688,10 +688,11 @@ def render_header_logos():
         </style>
 
         <div class="logos-wrapper">
-            <div class="logo-box">
+            <div class="logo-box logo-se">
                 <img src="data:image/png;base64,{se_logo_b64}" alt="Schneider Electric">
             </div>
-            <div class="logo-box">
+            
+            <div class="logo-box logo-ypf">
                 <img src="data:image/png;base64,{ypf_logo_b64}" alt="YPF">
             </div>
         </div>
