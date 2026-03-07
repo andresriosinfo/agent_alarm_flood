@@ -18,13 +18,7 @@ from src.data_loader import load_alarms
 from src.baseline_cache import get_or_create_baseline
 from src.operational_agent import assess_current_state
 
-import inspect
-st.write(inspect.signature(get_or_create_baseline))
-st.set_page_config(
-    page_title="Inteligencia de Alarmas",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
+
 
 st.markdown("""
 <style>
