@@ -6,8 +6,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-import inspect
-st.write(inspect.signature(get_or_create_baseline))
+
 
 # Asegura que se pueda importar src/
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,7 +18,8 @@ from src.data_loader import load_alarms
 from src.baseline_cache import get_or_create_baseline
 from src.operational_agent import assess_current_state
 
-
+import inspect
+st.write(inspect.signature(get_or_create_baseline))
 st.set_page_config(
     page_title="Inteligencia de Alarmas",
     layout="wide",
