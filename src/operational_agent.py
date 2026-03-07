@@ -1,121 +1,147 @@
-from src.baseline import compute_baseline_last_days
-from src.monitoring import read_recent_alarm_events, compute_recent_features
-from src.risk_engine import (
-    detect_regime_change,
-    compute_risk_score,
-    get_operational_state,
-    get_operational_posture,
-    get_recommended_action,
-)
-from src.block_builder import build_alarm_blocks
-from src.classifier import classify_blocks
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Optional
+
+import pandas as pd
+
+from src.config import DBConfig, FloodConfig
+from src.db import read_sql_df
 
 
-def _prepare_recent_for_block_builder(df_recent, flood_config):
-    if df_recent.empty:
-        return df_recent.copy()
+ARTIFACTS_DIR = Path("artifacts")
+ARTIFACTS_DIR.mkdir(exist_ok=True)
 
-    df = df_recent.copy()
-    df[flood_config.time_col] = df["event_time"]
-    df["TAGNAME"] = df["tag"]
-    df["MESSAGE"] = df["message"]
-    df[flood_config.priority_col] = df["priority"]
+
+def _compute_baseline_from_df(
+    df_alarms: pd.DataFrame,
+    flood_config: FloodConfig,
+) -> dict:
+    time_col = flood_config.time_col
+
+    if df_alarms is None or df_alarms.empty:
+        return {
+            "scope": f"last_{flood_config.baseline_window_days}_days",
+            "window_days": flood_config.baseline_window_days,
+            "rate_p95": 0.0,
+            "rate_p99": 0.0,
+            "rate_p999": 0.0,
+            "max_per_minute": 0,
+            "n_minutes": 0,
+        }
+
+    df = df_alarms.copy()
+
+    if time_col not in df.columns:
+        raise ValueError(
+            f"La columna de tiempo '{time_col}' no existe en el dataframe."
+        )
+
+    df[time_col] = pd.to_datetime(df[time_col], errors="coerce")
+    df = df.dropna(subset=[time_col]).sort_values(time_col)
+
+    if df.empty:
+        return {
+            "scope": f"last_{flood_config.baseline_window_days}_days",
+            "window_days": flood_config.baseline_window_days,
+            "rate_p95": 0.0,
+            "rate_p99": 0.0,
+            "rate_p999": 0.0,
+            "max_per_minute": 0,
+            "n_minutes": 0,
+        }
+
+    end_time = df[time_col].max()
+    start_time = end_time - pd.Timedelta(days=flood_config.baseline_window_days)
+
+    df_window = df[df[time_col] >= start_time].copy()
+
+    if df_window.empty:
+        df_window = df.copy()
+
+    per_minute = (
+        df_window.set_index(time_col)
+        .resample("1min")
+        .size()
+        .rename("alarm_count")
+        .to_frame()
+    )
+
+    if per_minute.empty:
+        return {
+            "scope": f"last_{flood_config.baseline_window_days}_days",
+            "window_days": flood_config.baseline_window_days,
+            "rate_p95": 0.0,
+            "rate_p99": 0.0,
+            "rate_p999": 0.0,
+            "max_per_minute": 0,
+            "n_minutes": 0,
+        }
+
+    counts = per_minute["alarm_count"]
+
+    return {
+        "scope": f"last_{flood_config.baseline_window_days}_days",
+        "window_days": flood_config.baseline_window_days,
+        "rate_p95": float(counts.quantile(0.95)),
+        "rate_p99": float(counts.quantile(0.99)),
+        "rate_p999": float(counts.quantile(0.999)),
+        "max_per_minute": int(counts.max()),
+        "n_minutes": int(len(counts)),
+    }
+
+
+def _load_df_from_sql(
+    conn,
+    db_config: DBConfig,
+    flood_config: FloodConfig,
+) -> pd.DataFrame:
+    query = f"SELECT * FROM {db_config.schema}.{db_config.table}"
+    df = read_sql_df(conn, query)
+
+    if flood_config.time_col in df.columns:
+        df[flood_config.time_col] = pd.to_datetime(
+            df[flood_config.time_col],
+            errors="coerce",
+        )
+
     return df
 
 
-def _detect_active_flood_from_recent(df_recent, baseline: dict, flood_config) -> tuple[bool, dict | None]:
-    if df_recent.empty:
-        return False, None
-
-    df_prepared = _prepare_recent_for_block_builder(df_recent, flood_config)
-
-    try:
-        df_blocks = build_alarm_blocks(
-            df_prepared,
-            flood_config,
-            tag_col="TAGNAME",
-            msg_col="MESSAGE",
-        )
-    except Exception:
-        return False, None
-
-    if df_blocks.empty:
-        return False, None
-
-    df_classified = classify_blocks(df_blocks, baseline, flood_config)
-
-    candidates = df_classified[
-        (df_classified["flood_candidate_v11"] == True) &
-        (df_classified["flood_type_v11"] != "OTHER_OR_NO_FLOOD")
-    ].copy()
-
-    if candidates.empty:
-        return False, None
-
-    latest = candidates.sort_values("start").iloc[-1].to_dict()
-    return True, latest
-
-
-def assess_current_state(
-    conn,
-    db_config,
-    flood_config,
-    anchor_time: str | None = None,
-    baseline: dict | None = None,
+def get_or_create_baseline(
+    *,
+    df_alarms: Optional[pd.DataFrame] = None,
+    conn=None,
+    db_config: Optional[DBConfig] = None,
+    flood_config: Optional[FloodConfig] = None,
+    force_recompute: bool = False,
 ) -> dict:
     """
-    Evaluación operacional unificada del estado actual o de un punto histórico.
-    Si anchor_time viene definido, evalúa la ventana que termina en ese instante.
-
-    Si baseline viene definido, lo reutiliza.
-    Si no viene, lo calcula.
+    Soporta dos modos:
+    1) Nuevo: get_or_create_baseline(df_alarms=df, flood_config=...)
+    2) Viejo: get_or_create_baseline(conn=..., db_config=..., flood_config=...)
     """
-    if baseline is None:
-        baseline = compute_baseline_last_days(conn, db_config, flood_config)
+    flood_config = flood_config or FloodConfig()
 
-    df_recent = read_recent_alarm_events(
-        conn,
-        db_config,
-        flood_config,
-        minutes=15,
-        anchor_time=anchor_time,
-    )
+    cache_file = ARTIFACTS_DIR / "baseline_cache.csv"
 
-    features = compute_recent_features(df_recent, baseline)
-    regime_change = detect_regime_change(features, baseline)
-    risk_score, reasons = compute_risk_score(features, baseline)
+    if not force_recompute and cache_file.exists():
+        try:
+            cached = pd.read_csv(cache_file)
+            if not cached.empty:
+                return cached.iloc[0].to_dict()
+        except Exception:
+            pass
 
-    flood_detected, current_event = _detect_active_flood_from_recent(
-        df_recent,
-        baseline,
-        flood_config,
-    )
+    if df_alarms is None:
+        if conn is None or db_config is None:
+            raise ValueError(
+                "Debes proporcionar df_alarms o bien conn + db_config."
+            )
+        df_alarms = _load_df_from_sql(conn, db_config, flood_config)
 
-    state = get_operational_state(
-        risk_score=risk_score,
-        flood_detected=flood_detected,
-    )
+    baseline = _compute_baseline_from_df(df_alarms, flood_config)
 
-    posture = get_operational_posture(state)
-    
-    recommended_action = get_recommended_action(
-        state=state,
-        current_event=current_event,
-    )
+    pd.DataFrame([baseline]).to_csv(cache_file, index=False)
 
-    if regime_change and not reasons:
-        reasons = ["recent alarm behavior differs from the normal baseline"]
-
-    return {
-        "anchor_time": anchor_time,
-        "baseline": baseline,
-        "recent_features": features,
-        "regime_change": regime_change,
-        "risk_score": risk_score,
-        "current_state": state,
-        "operational_posture": posture,
-        "reasons": reasons,
-        "flood_detected": flood_detected,
-        "current_event": current_event,
-        "recommended_action": recommended_action,
-    }
+    return baseline
